@@ -90,26 +90,47 @@ sys_uptime(void)
   return xticks;
 }
 
-int
-sys_dump(void)
-{
-
-int pid;
-if(argint(0, &pid) < 0)
+ int
+ sys_dump(void)
+ {
+  int pid;
+  int size;
+  char * addr;
+  char * buffer;
+  if(argint(0, &pid) < 0)
     return -1;
- 
-char *addr;
-if(argptr(1,&addr,4)<0)
-return -1;
+  if(argptr(1, &addr, 4) < 0)
+    return -1;
+  if(argptr(2, &buffer, 4) < 0)
+    return -1;
+  if(argint(3, &size) < 0)
+    return -1;
+  return dump(pid, addr, buffer, size);
+ }
 
-char *buffer;
-if(argptr(2,&buffer,4)<0)
-return -1;
 
-int size;
-if(argint(3,&size)<0)
-return -1;
+int
+sys_thread_create(void)
+{
+  void (*fcn)(void*);
+  void *arg; void *stack; 
+  if( argptr(0,(char **)&fcn, sizeof(void *))<0)
+    return -1;
+  if(argptr(1,(char **)&arg, sizeof(void *))<0)
+    return -1;
+  if(argptr(2,(char **)&stack,sizeof(void *))<0)
+    return -1;
+  return thread_create(fcn, arg, stack);
+}
 
-return dump(pid,addr,buffer,size);
+int
+sys_thread_join(void)
+{
+  return thread_join();
+}
 
+int
+sys_thread_exit(void)
+{
+  return thread_exit();
 }

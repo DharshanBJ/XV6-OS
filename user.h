@@ -24,6 +24,9 @@ char* sbrk(int);
 int sleep(int);
 int uptime(void);
 int dump(int,void*,void*,int);
+int thread_create(void(*fcn)(void *), void*, void*);
+int thread_join(void);
+int thread_exit(void);
 
 // ulib.c
 int stat(char*, struct stat*);
@@ -38,3 +41,21 @@ void* memset(void*, int, uint);
 void* malloc(uint);
 void free(void*);
 int atoi(const char*);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -554,13 +554,156 @@ release(&ptable.lock);
 uint pa;
 int i=0;
 //int offset=0;
+int guardPage=0;
 
 for(i = 0; i < size; i += PGSIZE){
 if(( pte = walkpgdir(pgdir, addr+i, 0))==0)
 	panic("no mapped pages");
+if(!(PTE_U & (*pte))){
+guardPage=i;
+}
+
  pa = PTE_ADDR(*pte);
  memmove(buffer,(char*)P2V(pa),4096);
  buffer+=4096;
  }
-return 0;
+return guardPage;
+}
+
+
+int thread_create(void(*fcn)(void*), void *arg, void*stack)
+{
+  int i, pid;
+    struct proc *np;
+    struct proc *curproc = myproc();
+
+    if((np = allocproc()) == 0){
+      return -1;
+    }
+    if(curproc->isthread==0)
+      np->parent=curproc;
+    else
+      np->parent=curproc->parent;
+        np->sz = curproc->sz;
+        *np->tf = *curproc->tf;
+      
+       np->tf->eax = 0;
+
+        np->pgdir = curproc->pgdir;
+        
+        np->tf->eip = (int)fcn;
+        
+        np->isthread = 1;
+       
+        np->stack = (int)stack;
+        np->tf->esp = (int)stack + 4092; 
+        *((int *)(np->tf->esp)) = (int)arg; 
+        *((int *)(np->tf->esp - 4)) = 0xFFFFFFFF;
+        np->tf->esp -= 4;
+
+        for(i = 0; i < NOFILE; i++)
+          if(curproc->ofile[i])
+            np->ofile[i] = filedup(curproc->ofile[i]);
+        np->cwd = idup(curproc->cwd);
+
+        safestrcpy(np->name, curproc->name, sizeof(curproc->name));
+
+        pid = np->pid;
+
+        acquire(&ptable.lock);
+        np->state = RUNNABLE;
+        release(&ptable.lock);
+
+        return pid;
+}
+
+
+int thread_join()
+{
+  struct proc *curproc = myproc();
+  void **stack;
+    if(argptr(0, (void*)&stack, sizeof(stack) < 0))
+        return -1;
+    if((curproc->sz-(uint)stack)< sizeof(void**))
+      return -1;
+    struct proc *p;
+    int havethreads, pid;
+
+    acquire(&ptable.lock);
+    for(;;){
+      
+    havethreads = 0;
+      for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+       
+        if(p->pgdir != curproc->pgdir )
+          continue;
+        if(p->parent != curproc )
+                continue;
+        havethreads = 1;
+
+        if(p->state == ZOMBIE ){
+        pid = p->pid;
+          p->state = UNUSED;
+          p->pid = 0;
+          p->parent = 0;
+          p->name[0] = 0;
+          p->killed = 0;
+        
+          release(&ptable.lock);
+          return pid;
+        }
+      }
+      
+         if(!havethreads || curproc->killed){
+           release(&ptable.lock);
+           return -1;
+         }
+         
+         sleep(curproc, &ptable.lock); 
+       }
+}
+
+
+int thread_exit()
+{
+  struct proc *curproc = myproc();
+   struct proc *p;
+    int fd;
+
+    if(curproc == initproc)
+      panic("init exit");
+
+    for(fd = 0; fd < NOFILE; fd++){
+      if(curproc->ofile[fd]){
+        fileclose(curproc->ofile[fd]);
+        curproc->ofile[fd] = 0;
+      }
+    }
+
+    iput(curproc->cwd);
+    curproc->cwd = 0;
+
+    acquire(&ptable.lock);
+
+    wakeup1(curproc->parent);
+
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->parent == curproc){
+        if(p->pgdir != curproc->pgdir){
+          p->parent = initproc;
+        if(p->state == ZOMBIE)
+        wakeup1(initproc);
+        }
+        else{
+    p->parent = 0;
+        p->state =ZOMBIE;
+      }
+
+    }
+  }
+
+  curproc->state = ZOMBIE;
+  sched();
+  panic("Exit zombie");
+  return 0;
 }

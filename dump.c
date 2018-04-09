@@ -23,11 +23,23 @@ int main(int argc, char *argv[])
 	int size=(int)sbrk(0);
 	char *buffer=malloc(size);
 	char *addr=0;
-	dump(pid,addr,buffer,size);
+	int guardPage=dump(pid,addr,buffer,size);
 	int *ptr=(int*)buffer;
 	int i=0;
 	for(i=0;i<size;i+=16)
 	{
+		if(i==guardPage){
+			printf(1,"******************Guard page starts here************************");
+			printf(1,"\n");
+		}
+		if(i==guardPage+4096){
+			printf(1,"******************Stack starts here*****************************");
+			printf(1,"\n");
+		}
+		if(i==guardPage+8192){
+			printf(1,"******************Heap starts here******************************");
+			printf(1,"\n");
+		}
 		printf(1,"0x%x\t",i);
 		printf(1,"0x%x\t",*ptr);
 		ptr++;

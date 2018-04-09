@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # clean binaries
 make clean
 
